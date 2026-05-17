@@ -1,0 +1,15 @@
+[Unit]
+Description=Prop Challenge Bot
+After=network.target
+
+[Service]
+Type=simple
+User=gpt
+WorkingDirectory=/home/gpt/prop-challenge-bot
+EnvironmentFile=/home/gpt/prop-challenge-bot/.env
+ExecStart=/home/gpt/prop-challenge-bot/venv/bin/python main.py
+Restart=always
+RestartSec=10
+
+[Install]
+WantedBy=multi-user.target
