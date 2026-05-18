@@ -43,4 +43,4 @@ SESSIONS = {
 MAX_DAILY_LOSS_PCT = 2.0
 MAX_TRADES_PER_DAY = 3
 
-DB_PATH = os.getenv("DB_PATH", "/data/prop_challenge.db")
+DB_PATH = os.getenv("DB_PATH", "data/prop_challenge.db")
