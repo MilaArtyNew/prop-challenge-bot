@@ -1,4 +1,8 @@
 def format_signal(s: dict) -> str:
+    import config
+    risk_usd = round(config.ACCOUNT_SIZE * config.RISK_PER_TRADE)
+    tp_usd = round(risk_usd * config.RR_TARGET)
+
     icon = "🟢" if s["direction"] == "LONG" else "🔴"
     strategy_labels = {
         "trend_pullback": "Trend Pullback",
@@ -13,9 +17,10 @@ def format_signal(s: dict) -> str:
         "━━━━━━━━━━━━━━━━━━━━━",
         f"Strategy: {label} {version}",
         f"Entry zone: {_fmt(s.get('entry_low'))} – {_fmt(s.get('entry_high'))}",
-        f"Stop Loss: {_fmt(s['stop_loss'])}",
+        f"Stop Loss:   {_fmt(s['stop_loss'])}",
         f"Take Profit: {_fmt(s['take_profit'])}",
         f"Risk/Reward: 1:{s['rr']}",
+        f"Risk: -${risk_usd} | Target: +${tp_usd}",
         f"ATR (15m): {_fmt(s['atr'])}",
     ]
 

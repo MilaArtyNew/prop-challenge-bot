@@ -1,4 +1,5 @@
 from typing import Optional
+import config
 
 
 def calculate_metrics(trades: list[dict]) -> dict:
@@ -36,14 +37,22 @@ def calculate_metrics(trades: list[dict]) -> dict:
         else:
             by_strategy[s]["losses"] += 1
 
+    acc = config.ACCOUNT_SIZE
+    total_pnl_pct = sum(t["pnl_pct"] for t in closed)
+
     return {
         "total": total,
         "open": len([t for t in trades if t["status"] == "open"]),
         "win_rate": round(win_rate, 1),
         "avg_win_pct": round(avg_win, 3),
         "avg_loss_pct": round(avg_loss, 3),
+        "avg_win_usd": round(avg_win / 100 * acc, 2),
+        "avg_loss_usd": round(avg_loss / 100 * acc, 2),
         "expectancy": round(expectancy, 4),
+        "expectancy_usd": round(expectancy / 100 * acc, 2),
         "profit_factor": profit_factor,
+        "total_pnl_pct": round(total_pnl_pct, 3),
+        "total_pnl_usd": round(total_pnl_pct / 100 * acc, 2),
         "avg_mae": round(avg_mae, 4),
         "avg_mfe": round(avg_mfe, 4),
         "by_strategy": by_strategy,

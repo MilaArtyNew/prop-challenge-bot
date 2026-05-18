@@ -12,8 +12,9 @@ STRATEGY_VERSION = "v1"
 TF_EXECUTION = "15m"
 TF_TREND = "1h"
 
-RISK_PER_TRADE = 0.009
-RR_TARGET = 2.0
+ACCOUNT_SIZE = 5000
+RISK_PER_TRADE = 0.009   # 0.9% = $45 на $5000
+RR_TARGET = 2.0          # TP = $90 на $5000
 
 # Strategy 1: Trend Pullback
 TP1_EMA_FAST = 50

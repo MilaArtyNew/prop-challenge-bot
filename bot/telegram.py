@@ -115,17 +115,17 @@ async def cmd_stats(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         wr_s = round(v["wins"] / total_s * 100, 1) if total_s else 0
         by_s_lines.append(f"  {strat}: {v['wins']}W/{v['losses']}L ({wr_s}%)")
 
+    sign = "+" if m["total_pnl_usd"] >= 0 else ""
     text = (
-        f"📊 Paper Trading Stats\n"
+        f"📊 Paper Trading — $5 000 account\n"
         f"━━━━━━━━━━━━━━━━━━━━━\n"
         f"Closed: {m['total']} | Open: {m.get('open', 0)}\n"
-        f"Win Rate:  {m['win_rate']}%\n"
-        f"Avg Win:   +{m['avg_win_pct']}%\n"
-        f"Avg Loss:  {m['avg_loss_pct']}%\n"
-        f"Expectancy: {m['expectancy']}%\n"
-        f"Prof. Factor: {pf}\n"
-        f"Avg MAE: {m['avg_mae']}\n"
-        f"Avg MFE: {m['avg_mfe']}\n"
+        f"Win Rate:    {m['win_rate']}%\n"
+        f"Avg Win:     +{m['avg_win_pct']}% (${m['avg_win_usd']})\n"
+        f"Avg Loss:    {m['avg_loss_pct']}% (-${abs(m['avg_loss_usd'])})\n"
+        f"Expectancy:  {m['expectancy']}% (${m['expectancy_usd']})\n"
+        f"Prof.Factor: {pf}\n"
+        f"Total PnL:   {sign}{m['total_pnl_pct']}% ({sign}${m['total_pnl_usd']})\n"
     )
     if by_s_lines:
         text += "\nBy strategy:\n" + "\n".join(by_s_lines)

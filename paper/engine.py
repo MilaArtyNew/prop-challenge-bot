@@ -78,11 +78,21 @@ async def monitor_open_trades(db: sqlite3.Connection) -> None:
                 close_reason, close_price = "tp", tp
 
         if close_reason:
-            fee_pct = (entry + close_price) / entry * config.TAKER_FEE * 100
+            # raw price move % (informational)
             if direction == "LONG":
-                pnl_pct = (close_price - entry) / entry * 100 - fee_pct
+                raw_pnl = (close_price - entry) / entry * 100
             else:
-                pnl_pct = (entry - close_price) / entry * 100 - fee_pct
+                raw_pnl = (entry - close_price) / entry * 100
+
+            # account-normalized PnL: fixed risk per trade with position sizing
+            sl_dist_pct = abs(entry - trade["stop_loss"]) / entry
+            leverage = config.RISK_PER_TRADE / sl_dist_pct if sl_dist_pct > 0 else 1
+            fee_account = config.TAKER_FEE * 2 * leverage * 100
+
+            if close_reason == "tp":
+                pnl_pct = config.RISK_PER_TRADE * 100 * config.RR_TARGET - fee_account
+            else:
+                pnl_pct = -(config.RISK_PER_TRADE * 100) - fee_account
 
             db.execute(
                 """
