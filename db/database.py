@@ -10,6 +10,36 @@ def get_db() -> sqlite3.Connection:
     return conn
 
 
+def seed_db(db: sqlite3.Connection) -> None:
+    """Seed initial data on first run (empty DB). Safe to call always — skips if data exists."""
+    if db.execute("SELECT COUNT(*) FROM signals").fetchone()[0] > 0:
+        return
+    try:
+        from db.seed_data import SEED_SIGNALS, SEED_PAPER_TRADES, SEED_REGIME_LOG
+    except ImportError:
+        return
+
+    for r in SEED_SIGNALS:
+        r.pop("id", None)
+        cols = ", ".join(r.keys())
+        placeholders = ", ".join("?" for _ in r)
+        db.execute(f"INSERT INTO signals ({cols}) VALUES ({placeholders})", list(r.values()))
+
+    for r in SEED_PAPER_TRADES:
+        r.pop("id", None)
+        cols = ", ".join(r.keys())
+        placeholders = ", ".join("?" for _ in r)
+        db.execute(f"INSERT INTO paper_trades ({cols}) VALUES ({placeholders})", list(r.values()))
+
+    for r in SEED_REGIME_LOG:
+        r.pop("id", None)
+        cols = ", ".join(r.keys())
+        placeholders = ", ".join("?" for _ in r)
+        db.execute(f"INSERT INTO regime_log ({cols}) VALUES ({placeholders})", list(r.values()))
+
+    db.commit()
+
+
 def init_db(db: sqlite3.Connection) -> None:
     db.executescript("""
         CREATE TABLE IF NOT EXISTS signals (

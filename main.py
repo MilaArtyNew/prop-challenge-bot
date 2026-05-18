@@ -6,7 +6,7 @@ import time
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from telegram.ext import Application
 
-from db.database import get_db, init_db
+from db.database import get_db, init_db, seed_db
 from signals.generator import scan_all
 from paper.engine import open_paper_trade, monitor_open_trades
 from bot.telegram import build_app, setup_commands, send_signal
@@ -101,6 +101,7 @@ async def main() -> None:
 
     db = get_db()
     init_db(db)
+    seed_db(db)
 
     app = build_app({"last_scan_time": None, "current_regime": {}})
 
