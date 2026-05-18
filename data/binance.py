@@ -1,10 +1,10 @@
 import httpx
 
-BASE_URL = "https://fapi.binance.com"
+BASE_URL = "https://api.binance.com"
 
 
 async def get_klines(symbol: str, interval: str, limit: int = 200) -> list[dict]:
-    url = f"{BASE_URL}/fapi/v1/klines"
+    url = f"{BASE_URL}/api/v3/klines"
     params = {"symbol": symbol, "interval": interval, "limit": limit}
     async with httpx.AsyncClient(timeout=10) as client:
         resp = await client.get(url, params=params)
@@ -25,7 +25,7 @@ async def get_klines(symbol: str, interval: str, limit: int = 200) -> list[dict]
 
 
 async def get_price(symbol: str) -> float:
-    url = f"{BASE_URL}/fapi/v1/ticker/price"
+    url = f"{BASE_URL}/api/v3/ticker/price"
     async with httpx.AsyncClient(timeout=5) as client:
         resp = await client.get(url, params={"symbol": symbol})
         resp.raise_for_status()
