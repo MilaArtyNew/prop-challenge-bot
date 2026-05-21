@@ -42,7 +42,19 @@ async def job_scan() -> None:
             logger.info(f"No setups found. Regime: {regime.get('regime')}")
             return
 
+        # Count today's trades (UTC midnight boundary)
+        today_start = int(time.time()) - (int(time.time()) % 86400)
+        trades_today = db.execute(
+            "SELECT COUNT(*) FROM paper_trades WHERE open_time >= ?",
+            (today_start,),
+        ).fetchone()[0]
+
         for signal in signals:
+            # Enforce MAX_TRADES_PER_DAY
+            if trades_today >= config.MAX_TRADES_PER_DAY:
+                logger.info(f"Daily trade limit reached ({trades_today}/{config.MAX_TRADES_PER_DAY}), skipping")
+                break
+
             # Max 1 open paper trade per strategy
             existing = db.execute(
                 "SELECT id FROM paper_trades WHERE strategy = ? AND status = 'open'",
@@ -50,6 +62,16 @@ async def job_scan() -> None:
             ).fetchone()
             if existing:
                 logger.info(f"Skip {signal['strategy']} on {signal['symbol']} — already open")
+                continue
+
+            # Symbol cooldown: skip if same symbol traded in last 4h
+            cooldown_since = int(time.time()) - 4 * 3600
+            recent = db.execute(
+                "SELECT id FROM paper_trades WHERE symbol = ? AND open_time >= ?",
+                (signal["symbol"], cooldown_since),
+            ).fetchone()
+            if recent:
+                logger.info(f"Skip {signal['symbol']} — cooldown active (traded in last 4h)")
                 continue
 
             cursor = db.execute(
@@ -82,6 +104,7 @@ async def job_scan() -> None:
 
             await open_paper_trade(signal, db)
             await send_signal(app, signal)
+            trades_today += 1
             logger.info(f"Signal: {signal['symbol']} {signal['direction']} {signal['strategy']}")
 
     except Exception:
