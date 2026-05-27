@@ -43,11 +43,13 @@ def format_regime(regime: dict) -> str:
     icons = {"BULL": "🐂", "BEAR": "🐻", "SIDEWAYS": "↔️", "UNKNOWN": "❓"}
     r = regime.get("regime", "UNKNOWN")
     icon = icons.get(r, "")
+    price_vs = regime.get("price_vs_ema50", "")
+    price_icon = "🔻" if price_vs == "below" else "🔺" if price_vs == "above" else ""
     lines = [
         f"{icon} BTC Regime: {r}",
         f"EMA50:  {_fmt(regime.get('ema50'))}",
         f"EMA200: {_fmt(regime.get('ema200'))}",
-        f"Price:  {_fmt(regime.get('price'))}",
+        f"Price:  {_fmt(regime.get('price'))} {price_icon} {'below' if price_vs == 'below' else 'above'} EMA50",
         f"Longs:  {'✅' if regime.get('long_allowed') else '❌'}",
         f"Shorts: {'✅' if regime.get('short_allowed') else '❌'}",
     ]
