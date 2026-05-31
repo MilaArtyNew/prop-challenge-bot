@@ -25,16 +25,14 @@ async def get_regime(symbol: str = "BTCUSDT") -> dict:
 
     if last_ema50 > last_ema200 and last_close > last_ema200:
         regime = "BULL"
-        long_allowed = last_close > last_ema50  # price above EMA50 — trend confirmed
-        short_allowed = False
     elif last_ema50 < last_ema200 and last_close < last_ema200:
         regime = "BEAR"
-        long_allowed = False
-        short_allowed = last_close < last_ema50  # price below EMA50 — not a pullback
     else:
         regime = "SIDEWAYS"
-        long_allowed = False
-        short_allowed = False
+
+    # Direction based on price vs EMA50 (independent of regime label)
+    long_allowed = last_close > last_ema50
+    short_allowed = last_close < last_ema50
 
     return {
         "regime": regime,
