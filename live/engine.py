@@ -308,16 +308,17 @@ def _format_opened(trade: dict) -> str:
     order_type = "LIMIT" if trade.get("strategy") == "trend_pullback" else "MARKET"
     risk_usd = round(config.ACCOUNT_SIZE * config.RISK_PER_TRADE, 2)
     target_usd = round(risk_usd * config.RR_TARGET, 2)
+    risk_pct = round(config.RISK_PER_TRADE * 100, 1)
+    target_pct = round(config.RISK_PER_TRADE * config.RR_TARGET * 100, 1)
 
     return (
         f"{icon} TRADE OPENED: {direction} {symbol}\n"
         f"━━━━━━━━━━━━━━━━━━━━━\n"
         f"Strategy:    {strategy} ({order_type})\n"
         f"Entry:       {_fmt(entry)}\n"
-        f"Stop Loss:   {_fmt(sl)}  (-{_fmt(sl_dist)})\n"
-        f"Take Profit: {_fmt(tp)}  (+{_fmt(tp_dist)})\n"
-        f"Leverage: {trade.get('leverage', '?')}x | Qty: {trade.get('quantity', '?')}\n"
-        f"Risk: -${risk_usd} | Target: +${target_usd}"
+        f"Stop Loss:   {_fmt(sl)}  (-${risk_usd}, -{risk_pct}%)\n"
+        f"Take Profit: {_fmt(tp)}  (+${target_usd}, +{target_pct}%)\n"
+        f"Leverage: {trade.get('leverage', '?')}x | Qty: {trade.get('quantity', '?')}"
     )
 
 
