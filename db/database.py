@@ -88,5 +88,31 @@ def init_db(db: sqlite3.Connection) -> None:
             ema200    REAL,
             price     REAL
         );
+
+        CREATE TABLE IF NOT EXISTS live_trades (
+            id               INTEGER PRIMARY KEY AUTOINCREMENT,
+            signal_id        INTEGER,
+            symbol           TEXT NOT NULL,
+            strategy         TEXT,
+            strategy_version TEXT,
+            direction        TEXT NOT NULL,
+            entry_price      REAL NOT NULL,
+            filled_price     REAL,
+            stop_loss        REAL NOT NULL,
+            take_profit      REAL NOT NULL,
+            open_time        INTEGER NOT NULL,
+            close_time       INTEGER,
+            close_price      REAL,
+            close_reason     TEXT,
+            pnl_pct          REAL,
+            mae              REAL DEFAULT 0,
+            mfe              REAL DEFAULT 0,
+            status           TEXT DEFAULT 'pending',
+            entry_order_id   INTEGER,
+            sl_order_id      INTEGER,
+            tp_order_id      INTEGER,
+            leverage         INTEGER,
+            quantity         REAL
+        );
     """)
     db.commit()

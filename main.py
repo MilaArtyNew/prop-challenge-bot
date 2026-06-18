@@ -9,6 +9,7 @@ from telegram.ext import Application
 from db.database import get_db, init_db, seed_db
 from signals.generator import scan_all
 from paper.engine import open_paper_trade, monitor_open_trades
+from live.engine import open_live_trade, monitor_live_trades
 from bot.telegram import build_app, setup_commands, send_signal
 import config
 
@@ -42,10 +43,12 @@ async def job_scan() -> None:
             logger.info(f"No setups found. Regime: {regime.get('regime')}")
             return
 
+        trade_table = "live_trades" if config.LIVE_TRADING else "paper_trades"
+
         # Count today's trades (UTC midnight boundary)
         today_start = int(time.time()) - (int(time.time()) % 86400)
         trades_today = db.execute(
-            "SELECT COUNT(*) FROM paper_trades WHERE open_time >= ?",
+            f"SELECT COUNT(*) FROM {trade_table} WHERE open_time >= ?",
             (today_start,),
         ).fetchone()[0]
 
@@ -55,9 +58,9 @@ async def job_scan() -> None:
                 logger.info(f"Daily trade limit reached ({trades_today}/{config.MAX_TRADES_PER_DAY}), skipping")
                 break
 
-            # Max 1 open paper trade per strategy
+            # Max 1 open trade per strategy
             existing = db.execute(
-                "SELECT id FROM paper_trades WHERE strategy = ? AND status = 'open'",
+                f"SELECT id FROM {trade_table} WHERE strategy = ? AND status IN ('open', 'pending')",
                 (signal["strategy"],),
             ).fetchone()
             if existing:
@@ -67,7 +70,7 @@ async def job_scan() -> None:
             # Symbol cooldown: skip if same symbol traded in last 4h
             cooldown_since = int(time.time()) - 4 * 3600
             recent = db.execute(
-                "SELECT id FROM paper_trades WHERE symbol = ? AND open_time >= ?",
+                f"SELECT id FROM {trade_table} WHERE symbol = ? AND open_time >= ?",
                 (signal["symbol"], cooldown_since),
             ).fetchone()
             if recent:
@@ -102,7 +105,10 @@ async def job_scan() -> None:
             signal["signal_id"] = cursor.lastrowid
             signal["regime"] = regime.get("regime")
 
-            await open_paper_trade(signal, db)
+            if config.LIVE_TRADING:
+                await open_live_trade(signal, db)
+            else:
+                await open_paper_trade(signal, db)
             await send_signal(app, signal)
             trades_today += 1
             logger.info(f"Signal: {signal['symbol']} {signal['direction']} {signal['strategy']}")
@@ -114,7 +120,10 @@ async def job_scan() -> None:
 async def job_monitor() -> None:
     global db
     try:
-        await monitor_open_trades(db)
+        if config.LIVE_TRADING:
+            await monitor_live_trades(db)
+        else:
+            await monitor_open_trades(db)
     except Exception:
         logger.exception("Monitor error")
 
