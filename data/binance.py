@@ -161,9 +161,38 @@ async def place_order(
     return await _signed_post("/fapi/v1/order", params)
 
 
+async def place_algo_order(
+    symbol: str,
+    side: str,
+    quantity: float,
+    order_type: str,
+    trigger_price: float,
+    reduce_only: bool = False,
+) -> dict:
+    params: dict = {
+        "symbol": symbol,
+        "side": side,
+        "type": order_type,
+        "algoType": "CONDITIONAL",
+        "quantity": quantity,
+        "triggerPrice": trigger_price,
+    }
+    if reduce_only:
+        params["reduceOnly"] = "true"
+    return await _signed_post("/fapi/v1/algoOrder", params)
+
+
 async def get_order(symbol: str, order_id: int) -> dict:
     return await _signed_get("/fapi/v1/order", {"symbol": symbol, "orderId": order_id})
 
 
+async def get_algo_order(algo_id: int) -> dict:
+    return await _signed_get("/fapi/v1/algoOrder", {"algoId": algo_id})
+
+
 async def cancel_order(symbol: str, order_id: int) -> dict:
     return await _signed_delete("/fapi/v1/order", {"symbol": symbol, "orderId": order_id})
+
+
+async def cancel_algo_order(algo_id: int) -> dict:
+    return await _signed_delete("/fapi/v1/algoOrder", {"algoId": algo_id})

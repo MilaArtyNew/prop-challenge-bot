@@ -5,7 +5,8 @@ import logging
 from typing import Callable, Awaitable
 from data.binance import (
     get_step_size, round_qty, set_leverage, set_margin_type,
-    place_order, get_order, cancel_order,
+    place_order, place_algo_order, get_order, get_algo_order,
+    cancel_order, cancel_algo_order,
 )
 import config
 
@@ -78,18 +79,18 @@ async def open_live_trade(signal: dict, db: sqlite3.Connection,
 
         sl_side = "SELL" if direction == "LONG" else "BUY"
         try:
-            sl_resp = await place_order(
+            sl_resp = await place_algo_order(
                 symbol, sl_side, quantity, "STOP_MARKET",
-                stop_price=round(sl, _price_precision(sl)),
+                trigger_price=round(sl, _price_precision(sl)),
                 reduce_only=True,
             )
-            tp_resp = await place_order(
+            tp_resp = await place_algo_order(
                 symbol, sl_side, quantity, "TAKE_PROFIT_MARKET",
-                stop_price=round(tp, _price_precision(tp)),
+                trigger_price=round(tp, _price_precision(tp)),
                 reduce_only=True,
             )
-            sl_order_id = sl_resp["orderId"]
-            tp_order_id = tp_resp["orderId"]
+            sl_order_id = sl_resp["algoId"]
+            tp_order_id = tp_resp["algoId"]
         except Exception as e:
             logger.error(f"SL/TP orders failed for {symbol}: {e}")
             sl_order_id = None
@@ -168,13 +169,13 @@ async def monitor_live_trades(db: sqlite3.Connection,
             if not order_id:
                 continue
             try:
-                order = await get_order(symbol, order_id)
+                order = await get_algo_order(order_id)
             except Exception as e:
-                logger.warning(f"get_order failed {symbol} #{order_id}: {e}")
+                logger.warning(f"get_algo_order failed {symbol} #{order_id}: {e}")
                 continue
 
-            if order["status"] == "FILLED":
-                close_price = float(order.get("avgPrice") or order.get("stopPrice"))
+            if order["algoStatus"] == "FILLED":
+                close_price = float(order.get("actualPrice") or order.get("triggerPrice"))
                 entry = trade["filled_price"] or trade["entry_price"]
                 pnl_pct = _calc_pnl(entry, close_price, direction, trade["stop_loss"], trade["leverage"])
                 db.execute(
@@ -190,7 +191,7 @@ async def monitor_live_trades(db: sqlite3.Connection,
                 other_id = trade["tp_order_id"] if reason == "sl" else trade["sl_order_id"]
                 if other_id:
                     try:
-                        await cancel_order(symbol, other_id)
+                        await cancel_algo_order(other_id)
                     except Exception:
                         pass
 
@@ -254,18 +255,18 @@ async def _monitor_pending(trade: dict, db: sqlite3.Connection,
         sl_order_id = None
         tp_order_id = None
         try:
-            sl_resp = await place_order(
+            sl_resp = await place_algo_order(
                 symbol, sl_side, quantity, "STOP_MARKET",
-                stop_price=round(sl, _price_precision(sl)),
+                trigger_price=round(sl, _price_precision(sl)),
                 reduce_only=True,
             )
-            tp_resp = await place_order(
+            tp_resp = await place_algo_order(
                 symbol, sl_side, quantity, "TAKE_PROFIT_MARKET",
-                stop_price=round(tp, _price_precision(tp)),
+                trigger_price=round(tp, _price_precision(tp)),
                 reduce_only=True,
             )
-            sl_order_id = sl_resp["orderId"]
-            tp_order_id = tp_resp["orderId"]
+            sl_order_id = sl_resp["algoId"]
+            tp_order_id = tp_resp["algoId"]
         except Exception as e:
             logger.error(f"SL/TP placement after fill failed {symbol}: {e}")
 
