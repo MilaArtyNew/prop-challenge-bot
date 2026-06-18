@@ -174,7 +174,7 @@ async def monitor_live_trades(db: sqlite3.Connection,
                 logger.warning(f"get_algo_order failed {symbol} #{order_id}: {e}")
                 continue
 
-            if order["algoStatus"] == "FILLED":
+            if order["algoStatus"] in ("FILLED", "FINISHED"):
                 close_price = float(order.get("actualPrice") or order.get("triggerPrice"))
                 entry = trade["filled_price"] or trade["entry_price"]
                 pnl_pct = _calc_pnl(entry, close_price, direction, trade["stop_loss"], trade["leverage"])
