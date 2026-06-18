@@ -2,6 +2,7 @@ import math
 import sqlite3
 import time
 import logging
+from typing import Callable, Awaitable
 from data.binance import (
     get_step_size, round_qty, set_leverage, set_margin_type,
     place_order, get_order, cancel_order,
@@ -9,6 +10,8 @@ from data.binance import (
 import config
 
 logger = logging.getLogger(__name__)
+
+SendFn = Callable[[str], Awaitable[None]]
 
 
 def _calc_leverage(entry: float, sl: float) -> int:
@@ -19,7 +22,8 @@ def _calc_leverage(entry: float, sl: float) -> int:
     return max(1, min(20, math.ceil(raw)))
 
 
-async def open_live_trade(signal: dict, db: sqlite3.Connection) -> int | None:
+async def open_live_trade(signal: dict, db: sqlite3.Connection,
+                          send: SendFn | None = None) -> int | None:
     symbol = signal["symbol"]
     direction = signal["direction"]
     entry = signal["entry"]
@@ -47,7 +51,6 @@ async def open_live_trade(signal: dict, db: sqlite3.Connection) -> int | None:
     side = "BUY" if direction == "LONG" else "SELL"
 
     if strategy == "trend_pullback":
-        order_type = "LIMIT"
         try:
             entry_resp = await place_order(
                 symbol, side, quantity, "LIMIT",
@@ -121,14 +124,28 @@ async def open_live_trade(signal: dict, db: sqlite3.Connection) -> int | None:
         ),
     )
     db.commit()
+
+    trade_row = dict(db.execute(
+        "SELECT * FROM live_trades WHERE id=?", (cursor.lastrowid,)
+    ).fetchone())
+
     logger.info(
         f"Live trade opened: {symbol} {direction} {strategy} "
         f"qty={quantity} lev={leverage}x status={status}"
     )
+
+    # Notify immediately for MARKET fills; LIMIT notifies when filled in monitor
+    if status == "open" and send:
+        try:
+            await send(_format_opened(trade_row))
+        except Exception as e:
+            logger.warning(f"Trade opened notification failed: {e}")
+
     return cursor.lastrowid
 
 
-async def monitor_live_trades(db: sqlite3.Connection) -> None:
+async def monitor_live_trades(db: sqlite3.Connection,
+                               send: SendFn | None = None) -> None:
     trades = db.execute(
         "SELECT * FROM live_trades WHERE status IN ('pending', 'open')"
     ).fetchall()
@@ -140,17 +157,13 @@ async def monitor_live_trades(db: sqlite3.Connection) -> None:
         direction = trade["direction"]
 
         if trade["status"] == "pending":
-            await _monitor_pending(trade, db)
+            await _monitor_pending(trade, db, send)
             continue
 
         # status == 'open' — check SL and TP orders
-        price = None
         closed = False
 
-        for order_type, order_id_key, reason in [
-            ("sl", "sl_order_id", "sl"),
-            ("tp", "tp_order_id", "tp"),
-        ]:
+        for order_type, reason in [("sl", "sl"), ("tp", "tp")]:
             order_id = trade.get(f"{order_type}_order_id")
             if not order_id:
                 continue
@@ -180,11 +193,17 @@ async def monitor_live_trades(db: sqlite3.Connection) -> None:
                         await cancel_order(symbol, other_id)
                     except Exception:
                         pass
+
                 logger.info(f"Live trade closed: {symbol} #{trade_id} via {reason} pnl={pnl_pct:.3f}%")
+
+                if send:
+                    try:
+                        await send(_format_closed(trade, close_price, reason, pnl_pct))
+                    except Exception as e:
+                        logger.warning(f"Trade closed notification failed: {e}")
                 break
 
         if not closed:
-            # update MAE/MFE
             try:
                 from data.binance import get_price
                 price = await get_price(symbol)
@@ -202,7 +221,8 @@ async def monitor_live_trades(db: sqlite3.Connection) -> None:
                 logger.warning(f"MAE/MFE update failed for {symbol}: {e}")
 
 
-async def _monitor_pending(trade: dict, db: sqlite3.Connection) -> None:
+async def _monitor_pending(trade: dict, db: sqlite3.Connection,
+                            send: SendFn | None = None) -> None:
     symbol = trade["symbol"]
     trade_id = trade["id"]
     order_id = trade["entry_order_id"]
@@ -211,7 +231,6 @@ async def _monitor_pending(trade: dict, db: sqlite3.Connection) -> None:
     sl = trade["stop_loss"]
     tp = trade["take_profit"]
 
-    # Cancel if order is older than LIMIT_ORDER_EXPIRY_MINUTES
     age_minutes = (int(time.time()) - trade["open_time"]) / 60
     if age_minutes > config.LIMIT_ORDER_EXPIRY_MINUTES:
         try:
@@ -259,9 +278,69 @@ async def _monitor_pending(trade: dict, db: sqlite3.Connection) -> None:
         db.commit()
         logger.info(f"Limit order filled: {symbol} #{trade_id} @ {filled_price}")
 
+        updated = dict(db.execute(
+            "SELECT * FROM live_trades WHERE id=?", (trade_id,)
+        ).fetchone())
+        if send:
+            try:
+                await send(_format_opened(updated))
+            except Exception as e:
+                logger.warning(f"Trade opened notification failed: {e}")
+
     elif order["status"] in ("CANCELED", "EXPIRED", "REJECTED"):
         db.execute("UPDATE live_trades SET status='cancelled' WHERE id=?", (trade_id,))
         db.commit()
+
+
+# ─── Message formatters ───────────────────────────────────────────────────────
+
+def _format_opened(trade: dict) -> str:
+    direction = trade["direction"]
+    symbol = trade["symbol"].replace("USDT", "/USDT")
+    icon = "🟢" if direction == "LONG" else "🔴"
+    entry = trade["filled_price"] or trade["entry_price"]
+    sl = trade["stop_loss"]
+    tp = trade["take_profit"]
+    sl_dist = abs(entry - sl)
+    tp_dist = abs(tp - entry)
+    strategy_labels = {"trend_pullback": "Trend Pullback", "vol_breakout": "Vol. Breakout"}
+    strategy = strategy_labels.get(trade.get("strategy", ""), trade.get("strategy", ""))
+    order_type = "LIMIT" if trade.get("strategy") == "trend_pullback" else "MARKET"
+    risk_usd = round(config.ACCOUNT_SIZE * config.RISK_PER_TRADE, 2)
+    target_usd = round(risk_usd * config.RR_TARGET, 2)
+
+    return (
+        f"{icon} TRADE OPENED: {direction} {symbol}\n"
+        f"━━━━━━━━━━━━━━━━━━━━━\n"
+        f"Strategy:    {strategy} ({order_type})\n"
+        f"Entry:       {_fmt(entry)}\n"
+        f"Stop Loss:   {_fmt(sl)}  (-{_fmt(sl_dist)})\n"
+        f"Take Profit: {_fmt(tp)}  (+{_fmt(tp_dist)})\n"
+        f"Leverage: {trade.get('leverage', '?')}x | Qty: {trade.get('quantity', '?')}\n"
+        f"Risk: -${risk_usd} | Target: +${target_usd}"
+    )
+
+
+def _format_closed(trade: dict, close_price: float,
+                   close_reason: str, pnl_pct: float) -> str:
+    direction = trade["direction"]
+    symbol = trade["symbol"].replace("USDT", "/USDT")
+    entry = trade["filled_price"] or trade["entry_price"]
+    pnl_usd = round(pnl_pct / 100 * config.ACCOUNT_SIZE, 2)
+
+    if close_reason == "tp":
+        icon, result = "✅", "TP HIT"
+    else:
+        icon, result = "❌", "SL HIT"
+
+    sign = "+" if pnl_pct >= 0 else ""
+    return (
+        f"{icon} TRADE CLOSED: {direction} {symbol}\n"
+        f"━━━━━━━━━━━━━━━━━━━━━\n"
+        f"Result:  {result}\n"
+        f"Entry:   {_fmt(entry)}  →  Exit: {_fmt(close_price)}\n"
+        f"PnL:     {sign}{round(pnl_pct, 3)}%  ({sign}${pnl_usd})"
+    )
 
 
 def _calc_pnl(entry: float, close: float, direction: str, sl: float, leverage: int) -> float:
@@ -280,3 +359,17 @@ def _price_precision(price: float) -> int:
     if price >= 10:
         return 2
     return 4
+
+
+def _fmt(v) -> str:
+    if v is None:
+        return "—"
+    if isinstance(v, float):
+        if v > 10_000:
+            return f"{v:,.1f}"
+        if v > 1_000:
+            return f"{v:,.2f}"
+        if v > 10:
+            return f"{v:.2f}"
+        return f"{v:.4f}"
+    return str(v)

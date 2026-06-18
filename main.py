@@ -106,7 +106,7 @@ async def job_scan() -> None:
             signal["regime"] = regime.get("regime")
 
             if config.LIVE_TRADING:
-                await open_live_trade(signal, db)
+                await open_live_trade(signal, db, send=_make_send(app))
             else:
                 await open_paper_trade(signal, db)
             await send_signal(app, signal)
@@ -118,14 +118,20 @@ async def job_scan() -> None:
 
 
 async def job_monitor() -> None:
-    global db
+    global db, app
     try:
         if config.LIVE_TRADING:
-            await monitor_live_trades(db)
+            await monitor_live_trades(db, send=_make_send(app))
         else:
             await monitor_open_trades(db)
     except Exception:
         logger.exception("Monitor error")
+
+
+def _make_send(application):
+    async def _send(text: str) -> None:
+        await application.bot.send_message(chat_id=config.TELEGRAM_CHAT_ID, text=text)
+    return _send
 
 
 async def main() -> None:

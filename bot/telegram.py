@@ -47,6 +47,72 @@ async def send_signal(app: Application, signal: dict) -> None:
     await app.bot.send_message(chat_id=config.TELEGRAM_CHAT_ID, text=text)
 
 
+async def send_trade_opened(app: Application, trade: dict) -> None:
+    direction = trade["direction"]
+    symbol = trade["symbol"].replace("USDT", "/USDT")
+    icon = "🟢" if direction == "LONG" else "🔴"
+    entry = trade["filled_price"] or trade["entry_price"]
+    sl = trade["stop_loss"]
+    tp = trade["take_profit"]
+    sl_dist = abs(entry - sl)
+    tp_dist = abs(tp - entry)
+    strategy_labels = {"trend_pullback": "Trend Pullback", "vol_breakout": "Vol. Breakout"}
+    strategy = strategy_labels.get(trade.get("strategy", ""), trade.get("strategy", ""))
+    order_type = "LIMIT" if trade.get("strategy") == "trend_pullback" else "MARKET"
+
+    text = (
+        f"{icon} TRADE OPENED: {direction} {symbol}\n"
+        f"━━━━━━━━━━━━━━━━━━━━━\n"
+        f"Strategy:  {strategy} ({order_type})\n"
+        f"Entry:     {_fmt(entry)}\n"
+        f"Stop Loss: {_fmt(sl)}  (-{_fmt(sl_dist)})\n"
+        f"Take Profit: {_fmt(tp)}  (+{_fmt(tp_dist)})\n"
+        f"Leverage:  {trade.get('leverage', '?')}x | Qty: {trade.get('quantity', '?')}\n"
+        f"Risk: -${round(config.ACCOUNT_SIZE * config.RISK_PER_TRADE, 2)} | "
+        f"Target: +${round(config.ACCOUNT_SIZE * config.RISK_PER_TRADE * config.RR_TARGET, 2)}"
+    )
+    await app.bot.send_message(chat_id=config.TELEGRAM_CHAT_ID, text=text)
+
+
+async def send_trade_closed(app: Application, trade: dict, close_price: float,
+                             close_reason: str, pnl_pct: float) -> None:
+    direction = trade["direction"]
+    symbol = trade["symbol"].replace("USDT", "/USDT")
+    entry = trade["filled_price"] or trade["entry_price"]
+    pnl_usd = round(pnl_pct / 100 * config.ACCOUNT_SIZE, 2)
+
+    if close_reason == "tp":
+        icon = "✅"
+        result = "TP HIT"
+    else:
+        icon = "❌"
+        result = "SL HIT"
+
+    sign = "+" if pnl_pct >= 0 else ""
+    text = (
+        f"{icon} TRADE CLOSED: {direction} {symbol}\n"
+        f"━━━━━━━━━━━━━━━━━━━━━\n"
+        f"Result:  {result}\n"
+        f"Entry:   {_fmt(entry)}  →  Exit: {_fmt(close_price)}\n"
+        f"PnL:     {sign}{round(pnl_pct, 3)}%  ({sign}${pnl_usd})"
+    )
+    await app.bot.send_message(chat_id=config.TELEGRAM_CHAT_ID, text=text)
+
+
+def _fmt(v) -> str:
+    if v is None:
+        return "—"
+    if isinstance(v, float):
+        if v > 10_000:
+            return f"{v:,.1f}"
+        if v > 1_000:
+            return f"{v:,.2f}"
+        if v > 10:
+            return f"{v:.2f}"
+        return f"{v:.4f}"
+    return str(v)
+
+
 async def cmd_start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     mode = "LIVE" if config.LIVE_TRADING else "PAPER"
     await update.message.reply_text(
