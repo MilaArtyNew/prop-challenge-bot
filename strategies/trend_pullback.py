@@ -57,11 +57,11 @@ async def find_setup(symbol: str, regime: dict) -> dict | None:
 
     if direction == "LONG":
         entry = price
-        sl = price - atr_val
+        sl = price - atr_val * config.TP1_SL_ATR_MULT
         tp = price + (price - sl) * config.RR_TARGET
     else:
         entry = price
-        sl = price + atr_val
+        sl = price + atr_val * config.TP1_SL_ATR_MULT
         tp = price - (sl - price) * config.RR_TARGET
 
     rr = round(abs(tp - entry) / abs(sl - entry), 2)
