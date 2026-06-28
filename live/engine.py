@@ -39,8 +39,8 @@ async def open_live_trade(signal: dict, db: sqlite3.Connection,
     step = await get_step_size(symbol)
     quantity = round_qty(notional / entry, step)
     if quantity <= 0:
-        logger.error(f"Calculated quantity is 0 for {symbol}, skipping")
-        return None
+        quantity = step
+        logger.warning(f"Quantity rounded to 0 for {symbol}, using minimum lot {step}")
 
     try:
         await set_margin_type(symbol, config.MARGIN_TYPE)
