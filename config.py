@@ -32,6 +32,7 @@ TP1_RSI_LONG_ZONE = (35, 55)
 TP1_RSI_SHORT_ZONE = (52, 62)
 TP1_PULLBACK_ATR_THRESHOLD = 1.0  # price within N ATRs of EMA50
 TP1_SL_ATR_MULT = 1.5            # SL distance in ATRs
+TP1_MIN_VOLUME_RATIO = 0.8       # minimum volume vs 20-bar avg
 
 # Strategy 2: Volatility Breakout
 VB_ATR_COMPRESSION = 0.7

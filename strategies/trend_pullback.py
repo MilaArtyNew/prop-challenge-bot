@@ -33,6 +33,9 @@ async def find_setup(symbol: str, regime: dict) -> dict | None:
     if e50 is None or rsi_val is None or atr_val is None:
         return None
 
+    if vol_rat is None or vol_rat < config.TP1_MIN_VOLUME_RATIO:
+        return None
+
     price = last["close"]
     direction = None
 
