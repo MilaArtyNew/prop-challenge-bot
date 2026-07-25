@@ -1,70 +1,85 @@
 # Prop Challenge Bot
 
-Telegram bot for prop-trading challenge signal monitoring and paper-trade tracking.
-
-The bot scans configured symbols, evaluates strategy setups, sends Telegram alerts, and tracks simulated trades with risk rules similar to prop challenge constraints.
+A Telegram bot project for automating operational workflows and user commands.
 
 ## Features
 
-- Binance market data collection.
-- Regime filter.
-- Trend pullback strategy.
-- Volatility breakout strategy.
-- Paper-trade engine and metrics.
-- Telegram signal delivery.
-- SQLite persistence.
-- Railway and systemd deployment files.
+- Telegram bot command handling and operational notifications.
+- Persistent storage for state, logs, or domain data.
 
-## Default Market Setup
+## Architecture
 
-Configured symbols:
+- **Repository:** `MilaArtyNew/prop-challenge-bot`
+- **Primary stack:** Python, systemd, Railway
+- **Entrypoints and scripts:**
+  - `main.py`
+- **Notable dependencies:** `apscheduler`, `httpx`, `python-dotenv`, `python-telegram-bot`
 
-- `BTCUSDT`
-- `ETHUSDT`
-- `SOLUSDT`
+## Configuration
 
-Default timeframes:
+Configure the service with environment variables. Do not commit real secrets to the repository.
 
-- Execution: `15m`
-- Trend: `1h`
+- `ACCOUNT_SIZE` — required or optional runtime configuration. See deployment environment for the actual value.
+- `BINANCE_API_KEY` — required or optional runtime configuration. See deployment environment for the actual value.
+- `BINANCE_API_SECRET` — required or optional runtime configuration. See deployment environment for the actual value.
+- `DB_PATH` — required or optional runtime configuration. See deployment environment for the actual value.
+- `LIVE_TRADING` — required or optional runtime configuration. See deployment environment for the actual value.
+- `TELEGRAM_CHAT_ID` — required or optional runtime configuration. See deployment environment for the actual value.
+- `TELEGRAM_TOKEN` — required or optional runtime configuration. See deployment environment for the actual value.
 
-## Environment
-
-```bash
-cp .env.example .env
-```
-
-Required variables:
-
-- `TELEGRAM_TOKEN` — Telegram bot token.
-- `TELEGRAM_CHAT_ID` — target chat ID.
-
-Optional:
-
-- `DB_PATH` — SQLite database path, default `data/prop_challenge.db`.
-
-## Local Run
+## Setup
 
 ```bash
+git clone https://github.com/MilaArtyNew/prop-challenge-bot
+cd prop-challenge-bot
 python3 -m venv .venv
 source .venv/bin/activate
 pip install -r requirements.txt
-cp .env.example .env
-nano .env
+```
+
+## Running Locally
+
+```bash
 python main.py
 ```
 
-## Deployment
+## Bot Commands
 
-The repository includes:
+- `/help` — Show help and available commands.
+- `/paperstats` — Project-specific command; see the bot implementation for exact behavior.
+- `/papertrades` — Project-specific command; see the bot implementation for exact behavior.
+- `/regime` — Project-specific command; see the bot implementation for exact behavior.
+- `/signals` — Show signals.
+- `/start` — Start the bot and show the main entry message.
+- `/stats` — Show runtime or trading statistics.
+- `/status` — Show current service or strategy status.
+- `/trades` — Show trades.
 
-- `railway.toml`
-- `prop-challenge.service`
+If a command requires extra input and the argument is missing, the bot should ask a follow-up question instead of failing silently.
 
-Set environment variables in the target runtime. Do not commit `.env`.
+## Deployment Notes
 
-## Risk Notes
+- Keep secrets in the deployment platform environment variables, not in Git.
+- Use the default branch as the source of truth for deployments.
+- Check logs after every deployment and verify the `/status` or health endpoint when available.
+- If the project uses a scheduler, verify timezone assumptions and idempotency before enabling it in production.
 
-- This bot is for signal monitoring and paper-trade tracking.
-- It does not guarantee prop challenge success.
-- Validate all signals manually before using any live execution workflow.
+## Operational Notes
+
+- Review logs after startup for missing environment variables or API authentication errors.
+- Keep command names in English and document every user-facing command in this README.
+- For Telegram bots, `/help` should list the same commands documented here.
+- Inline buttons should edit the original message with the final status rather than sending duplicate messages.
+
+## Troubleshooting
+
+- **Bot does not respond:** verify the bot token, webhook/polling mode, and chat permissions.
+- **Missing data:** check API keys, rate limits, and upstream service status.
+- **Deployment starts but exits:** inspect platform logs for missing environment variables or import errors.
+- **Commands differ from README:** update the command list here and in the bot command menu at the same time.
+
+## Security
+
+- Never commit `.env` files, API keys, private keys, Telegram tokens, or session strings.
+- Use `.env.example` for placeholders only.
+- Rotate any credential that was accidentally committed.
