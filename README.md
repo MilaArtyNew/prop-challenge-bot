@@ -1,11 +1,12 @@
 # Prop Challenge Bot
 
-A Telegram bot project for automating operational workflows and user commands.
+Prop challenge trading signal bot for testing rule-based strategies under prop-firm constraints. It tracks regimes, signals, trades, paper stats, and strategy performance through Telegram commands.
 
 ## Features
 
-- Telegram bot command handling and operational notifications.
-- Persistent storage for state, logs, or domain data.
+- Monitors trading regimes and strategy signals.
+- Tracks paper trades, paper statistics, live-style trades, and status.
+- Documents commands for reviewing signals, trades, stats, and regime state.
 
 ## Architecture
 
@@ -46,9 +47,9 @@ python main.py
 ## Bot Commands
 
 - `/help` — Show help and available commands.
-- `/paperstats` — Project-specific command; see the bot implementation for exact behavior.
-- `/papertrades` — Project-specific command; see the bot implementation for exact behavior.
-- `/regime` — Project-specific command; see the bot implementation for exact behavior.
+- `/paperstats` — Show paper-trading statistics.
+- `/papertrades` — Show paper-trade history.
+- `/regime` — Show current market regime.
 - `/signals` — Show signals.
 - `/start` — Start the bot and show the main entry message.
 - `/stats` — Show runtime or trading statistics.
