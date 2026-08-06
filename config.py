@@ -13,7 +13,7 @@ LIVE_TRADING = os.getenv("LIVE_TRADING", "false").lower() == "true"
 MARGIN_TYPE = "CROSSED"
 LIMIT_ORDER_EXPIRY_MINUTES = 30
 
-SYMBOLS = ["BTCUSDT", "ETHUSDT", "SOLUSDT"]
+SYMBOLS = ["BTCUSDT"]
 STRATEGY_VERSION = "v1"
 
 TF_EXECUTION = "15m"
@@ -51,5 +51,6 @@ SESSIONS = {
 
 MAX_DAILY_LOSS_PCT = 2.0
 MAX_TRADES_PER_DAY = 3
+BLACKLISTED_HOURS_UTC = {0, 17}  # hours to skip entry (midnight candle + US open noise)
 
 DB_PATH = os.getenv("DB_PATH", "data/prop_challenge.db")
