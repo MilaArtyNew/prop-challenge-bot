@@ -42,6 +42,8 @@ def calculate_metrics(trades: list[dict]) -> dict:
 
     return {
         "total": total,
+        "wins": len(wins),
+        "losses": len(losses),
         "open": len([t for t in trades if t["status"] == "open"]),
         "win_rate": round(win_rate, 1),
         "avg_win_pct": round(avg_win, 3),

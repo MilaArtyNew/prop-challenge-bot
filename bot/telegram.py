@@ -174,44 +174,54 @@ async def cmd_regime(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None
     await update.message.reply_text(format_regime(regime))
 
 
+BTC_ONLY_SINCE = 1785974400  # 2026-08-06 00:00 UTC — BTC only + blacklisted hours
+
+
+def _stats_block(trades: list[dict], label: str) -> str:
+    m = calculate_metrics(trades)
+    if m["total"] == 0:
+        return f"📊 {label}\n━━━━━━━━━━━━━━━━━━━━━\nНет закрытых сделок.\n"
+    pf = f"{m['profit_factor']}" if m["profit_factor"] else "N/A"
+    sign = "+" if m["total_pnl_usd"] >= 0 else ""
+    return (
+        f"📊 {label}\n"
+        f"━━━━━━━━━━━━━━━━━━━━━\n"
+        f"Закрыто: {m['total']}  ({m.get('wins',0)}W / {m.get('losses',0)}L)\n"
+        f"Win Rate:    {m['win_rate']}%\n"
+        f"Avg Win:     +${m['avg_win_usd']}\n"
+        f"Avg Loss:    -${abs(m['avg_loss_usd'])}\n"
+        f"Prof.Factor: {pf}\n"
+        f"Total PnL:   {sign}${m['total_pnl_usd']}\n"
+    )
+
+
 async def cmd_stats(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     db = get_db()
     if config.LIVE_TRADING:
-        rows = db.execute("SELECT * FROM live_trades ORDER BY open_time DESC LIMIT 500").fetchall()
-        label = f"Live Trading — ${config.ACCOUNT_SIZE:,} account"
+        all_rows = db.execute(
+            "SELECT * FROM live_trades WHERE status='closed' ORDER BY open_time DESC LIMIT 500"
+        ).fetchall()
+        btc_rows = db.execute(
+            "SELECT * FROM live_trades WHERE status='closed' AND symbol='BTCUSDT' AND open_time >= ? ORDER BY open_time DESC LIMIT 500",
+            (BTC_ONLY_SINCE,),
+        ).fetchall()
     else:
-        rows = db.execute("SELECT * FROM paper_trades ORDER BY open_time DESC LIMIT 500").fetchall()
-        label = f"Paper Trading — ${config.ACCOUNT_SIZE:,} account"
+        all_rows = db.execute(
+            "SELECT * FROM paper_trades WHERE status='closed' ORDER BY open_time DESC LIMIT 500"
+        ).fetchall()
+        btc_rows = []
     db.close()
 
-    trades = [dict(r) for r in rows]
-    m = calculate_metrics(trades)
+    all_trades = [dict(r) for r in all_rows]
+    btc_trades = [dict(r) for r in btc_rows]
 
-    if m["total"] == 0:
+    if not all_trades:
         await update.message.reply_text("No closed trades yet.")
         return
 
-    pf = f"{m['profit_factor']}" if m["profit_factor"] else "N/A"
-    by_s_lines = []
-    for strat, v in m.get("by_strategy", {}).items():
-        total_s = v["wins"] + v["losses"]
-        wr_s = round(v["wins"] / total_s * 100, 1) if total_s else 0
-        by_s_lines.append(f"  {strat}: {v['wins']}W/{v['losses']}L ({wr_s}%)")
-
-    sign = "+" if m["total_pnl_usd"] >= 0 else ""
-    text = (
-        f"📊 {label}\n"
-        f"━━━━━━━━━━━━━━━━━━━━━\n"
-        f"Closed: {m['total']} | Open: {m.get('open', 0)}\n"
-        f"Win Rate:    {m['win_rate']}%\n"
-        f"Avg Win:     +{m['avg_win_pct']}% (${m['avg_win_usd']})\n"
-        f"Avg Loss:    {m['avg_loss_pct']}% (-${abs(m['avg_loss_usd'])})\n"
-        f"Expectancy:  {m['expectancy']}% (${m['expectancy_usd']})\n"
-        f"Prof.Factor: {pf}\n"
-        f"Total PnL:   {sign}{m['total_pnl_pct']}% ({sign}${m['total_pnl_usd']})\n"
-    )
-    if by_s_lines:
-        text += "\nBy strategy:\n" + "\n".join(by_s_lines)
+    text = _stats_block(all_trades, f"Всего (с 18.06.2026) — ${config.ACCOUNT_SIZE}")
+    if btc_trades:
+        text += "\n" + _stats_block(btc_trades, "BTC only (с 06.08.2026)")
 
     await update.message.reply_text(text)
 
